@@ -1,0 +1,194 @@
+# AGENTS.md — Four in a Row AI Project (read this first, every session)
+
+## What this project is
+
+A university AI project: a Four in a Row (Connect Four, 7 columns x 6 rows) AI,
+built as a small research project and packaged as a usable "strategy coach" app.
+The student must present it in **10 minutes** and run a **2–3 minute live demo**.
+The professor prefers a **real-life style implementation**, so the app must feel like
+a working product: playable, with live stats, hints, and visible AI reasoning.
+
+The student MUST be able to explain every function to the professor. Therefore:
+**clarity beats cleverness.** Prefer simple, readable code with comments over tricks.
+
+## Tech stack (do not add dependencies without asking)
+
+Python 3.10+, `pygame`, `numpy` (optional), `matplotlib`, `pandas`, `pytest`.
+Everything else must be the Python standard library. Runs on Linux, CPU only, no GPU,
+no network access at runtime.
+
+## Documents — read the ones named for the layer you are working on
+
+- `docs/ARCHITECTURE.md` — folders, interfaces, naming. Read before ANY layer.
+- `docs/LAYERS.md` — the ten build layers, with requirements and acceptance tests.
+- `docs/ALGORITHMS.md` — exact specs for Minimax, Alpha-Beta, ordering, iterative
+  deepening, transposition table, evaluation, MCTS.
+- `docs/FRONTEND.md` — design and behavior of the Pygame app (layer v8).
+- `docs/EXPERIMENTS.md` — experiment protocols, CSV schema, graphs (layer v9).
+- `docs/TESTING.md` — test rules and the definition of done.
+
+## Working rules (hard rules)
+
+1. **One layer at a time.** Build only the layer the student asked for. Do not start the
+   next layer, do not "improve" earlier layers unless asked. Stop when it is done.
+2. **Plan first.** Before writing code, state in 3–6 lines what you will create/change.
+3. **Do not change public interfaces** (names, signatures, return types in
+   `docs/ARCHITECTURE.md`) without asking. Every agent must stay interchangeable.
+4. **Tests are part of the layer.** Write tests with the code. Run them. Report the real
+   output. Never claim something passes without running it. Never delete or weaken a test
+   to make it pass.
+5. **Be honest about uncertainty.** If a requirement is unclear, ask one short question or
+   state your assumption in the plan. Do not invent results or numbers.
+6. **No fake data.** Experiment results must come from actually running the code.
+   Never hardcode numbers into graphs or reports.
+7. **Determinism.** Anything random takes a seed (`random.Random(seed)`). No use of the
+   global `random` state. Same seed => same result.
+8. **Keep the board safe.** `choose_move(board)` must leave `board` exactly as it found it
+   (search with `drop`/`undo`). Add a test for this.
+9. **Code style:** type hints on public functions, a docstring on every public function and
+   class, short functions (aim under ~40 lines), constants in `config.py`, no global mutable
+   state, no wildcard imports. Comments explain _why_, not just _what_.
+10. **No new dependencies, no network calls, no files outside the project folder.**
+
+## End-of-layer checklist (always finish your reply with this)
+
+- Files created/changed (list).
+- How to run the tests and the exact command.
+- Test results (real output, summarized).
+- "Explain it simply": 5–8 lines the student can say out loud to the professor.
+- Known limitations or assumptions.
+- Suggested git commit message, e.g. `v3-alpha-beta`.
+  Then STOP and wait for the student.
+  EOF
+
+cat > docs/ARCHITECTURE.md <<'EOF'
+
+# ARCHITECTURE.md — folders, interfaces, conventions
+
+## Folder layout
+
+```
+four-in-a-row/
+├── AGENTS.md
+├── docs/                      (these instruction files)
+├── config.py                  constants (sizes, scores, seeds, time limits)
+├── game/
+│   ├── __init__.py
+│   └── board.py               Board class (rules only, no AI, no drawing)
+├── agents/
+│   ├── __init__.py
+│   ├── base.py                Agent base class, SearchStats dataclass
+│   ├── simple.py              RandomAgent, GreedyAgent (baselines)
+│   ├── minimax.py             MinimaxAgent
+│   ├── alphabeta.py           AlphaBetaAgent (options: ordering, ID, TT)
+│   ├── evaluation.py          evaluate(), WEIGHTS dict
+│   ├── zobrist.py             Zobrist table + TranspositionTable
+│   └── mcts.py                MCTSAgent
+├── gui/
+│   ├── __init__.py
+│   ├── theme.py               colors, fonts, sizes (single source of look)
+│   ├── app.py                 main loop, screen state machine
+│   ├── screens.py             menu, game, ai_vs_ai, results, game_over
+│   ├── widgets.py             Button, Dropdown, Slider, Panel, EvalBar
+│   ├── animation.py           easing, falling disc, win pulse
+│   └── hint.py                hint analysis + reason text
+├── experiments/
+│   ├── ablation.py
+│   ├── tournament.py
+│   ├── depth_study.py
+│   ├── tune_weights.py
+│   ├── positions.py           seeded test positions + openings
+│   └── plots.py               matplotlib graphs from CSV
+├── results/                   CSV + PNG outputs (generated, not hand-written)
+├── tests/                     pytest files, one per module
+├── report/                    notes.md (running notes per layer)
+├── requirements.txt
+└── README.md
+```
+
+## Conventions
+
+- **Players:** `1` = first player (moves first, shown coral), `2` = second player
+  (shown gold), `0` = empty cell.
+- **Coordinates:** columns `0..6` left to right. Rows `0..5` with **row 0 = bottom row**
+  (so a dropped disc lands on the lowest empty row). The GUI flips rows for drawing.
+- **Text format for tests** (`Board.from_string` / `to_string`): 6 lines, top row first,
+  7 characters each: `.` empty, `X` player 1, `O` player 2. Example:
+
+```
+.......
+.......
+.......
+...X...
+...O...
+..XOX..
+```
+
+The side to move is derived from the number of discs (player 1 moves when counts are
+equal).
+
+## Board interface (`game/board.py`)
+
+```python
+class Board:
+    ROWS = 6; COLS = 7
+    grid: list[list[int]]          # grid[row][col], row 0 = bottom
+    move_history: list[int]        # columns played, in order
+    def legal_moves(self) -> list[int]          # ascending columns that are not full
+    def current_player(self) -> int             # 1 or 2, derived from move count
+    def drop(self, col: int) -> int             # places disc, returns row; ValueError if full/invalid
+    def undo(self) -> int                       # removes last disc, returns its column
+    def winner(self) -> int                     # 0 none, 1 or 2 (checks around last move)
+    def is_full(self) -> bool
+    def is_terminal(self) -> bool               # winner != 0 or full
+    def winning_cells(self) -> list[tuple[int,int]]   # the 4 cells of the win, else []
+    def copy(self) -> "Board"
+    def to_string(self) -> str
+    @classmethod
+    def from_string(cls, s: str) -> "Board"
+    # added in layer v5:
+    hash: int                                   # Zobrist hash, updated in drop/undo
+```
+
+`legal_moves()` returns plain ascending order. **Move ordering is the agent's job**, not
+the board's.
+
+## Agent interface (`agents/base.py`)
+
+```python
+@dataclass
+class SearchStats:
+    nodes: int = 0                 # positions visited by the search
+    cutoffs: int = 0               # alpha-beta cutoffs (branches pruned)
+    tt_hits: int = 0               # transposition-table hits
+    time_s: float = 0.0
+    depth_reached: int = 0         # deepest fully completed depth (0 for MCTS)
+    score: float | None = None     # agent's own evaluation of chosen move
+    best_move: int | None = None
+    simulations: int = 0           # MCTS only
+    column_scores: dict[int, float] | None = None   # optional, for hint / panel
+
+class Agent:
+    name: str
+    last_stats: SearchStats
+    on_progress: Callable[[dict], None] | None = None   # optional GUI callback
+    def choose_move(self, board: Board) -> int           # must not change `board`
+```
+
+- `choose_move` returns a legal column. It is never called on a terminal board.
+- `on_progress` (if set) is called by iterative deepening / MCTS with a small dict such
+  as `{"depth": 5, "best_move": 3, "score": 12, "nodes": 4210}` so the GUI can show the
+  AI "thinking". Agents must work fine when it is `None`.
+
+## config.py (constants only, no logic)
+
+`ROWS, COLS, WIN_SCORE (=1_000_000), MOVE_ORDER (=[3,2,4,1,5,0,6]), DEFAULT_TIME_LIMIT
+(=1.0 s), TT_MAX_ENTRIES (=1_000_000), ZOBRIST_SEED, MCTS_C (=1.41), GLOBAL_SEED (=42)`.
+
+## Naming for agent options (used by experiments and the GUI)
+
+`AlphaBetaAgent(depth=6, use_ordering=True, use_iterative_deepening=False,
+time_limit=None, use_tt=False, weights=None, name=None)`.
+`MinimaxAgent(depth=4, weights=None)`.
+`MCTSAgent(simulations=2000, time_limit=None, c=1.41, rollout="random", seed=42)`.
+EOF

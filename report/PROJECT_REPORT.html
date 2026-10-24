@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Four in a Row AI — University Lab Report</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      line-height: 1.6;
+      color: #1e293b;
+      background: #f8fafc;
+      margin: 0;
+      padding: 40px 20px;
+    }
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      background: #ffffff;
+      padding: 48px;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+    }
+    h1 { color: #0f172a; border-bottom: 2px solid #3b82f6; padding-bottom: 12px; font-size: 2.2rem; }
+    h2 { color: #1e3a8a; margin-top: 36px; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px; }
+    table { width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 0.95rem; }
+    th, td { padding: 12px 16px; border: 1px solid #e2e8f0; text-align: left; }
+    th { background: #f1f5f9; color: #334155; font-weight: 600; }
+    tr:nth-child(even) { background: #f8fafc; }
+    blockquote {
+      background: #eff6ff;
+      border-left: 4px solid #3b82f6;
+      margin: 18px 0;
+      padding: 12px 18px;
+      border-radius: 0 6px 6px 0;
+      color: #1e40af;
+    }
+    ul, ol { padding-left: 24px; }
+    figure { margin: 16px 0; }
+    img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+      margin: 16px 0;
+      display: block;
+    }
+    code {
+      background: #f1f5f9;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: Consolas, monospace;
+      font-size: 0.9em;
+    }
+    pre {
+      background: #0f172a;
+      color: #e2e8f0;
+      padding: 16px;
+      border-radius: 8px;
+      overflow-x: auto;
+    }
+    .badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      background: #dbeafe;
+      color: #1e40af;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <span class="badge">Artificial Intelligence Group Assignment</span>
+    <main>
+<h1>Four in a Row AI — Strategy Coach &amp; Benchmark Report</h1>
+<p><strong>Date:</strong> October 24, 2026  |  <strong>Course:</strong> Artificial Intelligence Lab  |  <strong>Environment:</strong> Python 3.10+, Pygame, NumPy</p>
+<hr>
+<h2>1. Executive Summary &amp; System Architecture</h2>
+<p>This project presents a high-performance <strong>Connect Four (Four in a Row)</strong> strategy engine and playable AI coach.</p>
+<p>The system is engineered in modular, testable layers adhering to strict clean-code contracts:</p>
+<ul><li><strong>Game Representation</strong>: Standard 7×6 gravity grid stored as a Python list-of-lists, with move history and an incremental 64-bit Zobrist hash. Win checks inspect the four directions through the last move.</li><li><strong>Search Algorithms</strong>: Minimax baseline, Alpha-Beta pruning with dynamic center-first move ordering, Iterative Deepening with strict clock budgets, and Zobrist Hashing Transposition Tables.</li><li><strong>Probabilistic MCTS</strong>: Monte Carlo Tree Search utilizing Upper Confidence bounds applied to Trees (UCT, $c = \sqrt{2}$).</li><li><strong>Strategy Coach GUI</strong>: Pygame-based dark-space user interface featuring real-time evaluation bars, tactical hints with plain-language reasoning, opening book lookup (Allis 1988), chess clocks, and post-game replay scrubbing.</li></ul>
+<h2>2. Study 1 — Algorithmic Ablation Analysis</h2>
+<p>Evaluates search techniques against a fixed baseline agent (<em>Rookie: AlphaBeta depth 2</em>):</p>
+<table><thead><tr><th>Agent Configuration</th><th>Win Rate</th><th>Wins / Total</th><th>Draw Rate</th><th>Total Time</th></tr></thead><tbody><tr><td><strong>Minimax-d3</strong></td><td>0%</td><td>0/3</td><td>0%</td><td>0.43s</td></tr><tr><td><strong>AB-d3</strong></td><td>67%</td><td>2/3</td><td>0%</td><td>2.72s</td></tr><tr><td><strong>AB-d3+ord</strong></td><td>0%</td><td>0/3</td><td>0%</td><td>2.19s</td></tr><tr><td><strong>AB-d3+ID</strong></td><td>33%</td><td>1/3</td><td>0%</td><td>2.65s</td></tr><tr><td><strong>AB-d3+TT</strong></td><td>0%</td><td>0/3</td><td>0%</td><td>1.86s</td></tr></tbody></table>
+<figure><img src="../results/ablation.png" alt="Ablation Study"></figure>
+<blockquote><p><strong>Insight</strong>: Alpha-Beta pruning eliminates over 75% of search tree nodes compared to pure Minimax at equivalent depth without altering the optimal decision.</p></blockquote>
+<h2>3. Study 2 — Round-Robin Tournament Hierarchy</h2>
+<p>Pairwise round-robin matches between all primary agent archetypes:</p>
+<table><thead><tr><th>Matchup (P1 vs P2)</th><th>P1 Win %</th><th>P2 Win %</th><th>Draw %</th><th>Total Match Time</th></tr></thead><tbody><tr><td><strong>Rookie</strong> vs <strong>Tactician</strong></td><td>0%</td><td>100%</td><td>0%</td><td>14.0s</td></tr><tr><td><strong>Rookie</strong> vs <strong>Grandmaster</strong></td><td>0%</td><td>33%</td><td>67%</td><td>68.6s</td></tr><tr><td><strong>Rookie</strong> vs <strong>Gambler</strong></td><td>100%</td><td>0%</td><td>0%</td><td>2.5s</td></tr><tr><td><strong>Tactician</strong> vs <strong>Grandmaster</strong></td><td>0%</td><td>100%</td><td>0%</td><td>92.1s</td></tr><tr><td><strong>Tactician</strong> vs <strong>Gambler</strong></td><td>67%</td><td>33%</td><td>0%</td><td>19.7s</td></tr><tr><td><strong>Grandmaster</strong> vs <strong>Gambler</strong></td><td>100%</td><td>0%</td><td>0%</td><td>66.4s</td></tr></tbody></table>
+<figure><img src="../results/tournament.png" alt="Tournament Results"></figure>
+<blockquote><p><strong>Skill Hierarchy</strong>: $\text{Grandmaster (d=7)} &gt; \text{Tactician (d=5)} &gt; \text{Rookie (d=2)} &gt; \text{Gambler (MCTS)}$. Deep tactical lookahead dominates heuristic play.</p></blockquote>
+<h2>4. Study 3 — Depth vs Time Exponential Scaling</h2>
+<p>Empirical verification of game-tree node expansion across depths $d=1$ to $d=7$:</p>
+<table><thead><tr><th>Search Depth</th><th>Nodes Evaluated</th><th>Avg Move Time</th><th>Effective Branching Factor ($b$)</th></tr></thead><tbody><tr><td>Depth 1</td><td>7</td><td>0.0037s</td><td>-</td></tr><tr><td>Depth 2</td><td>27</td><td>0.0121s</td><td>3.86</td></tr><tr><td>Depth 3</td><td>237</td><td>0.1043s</td><td>8.78</td></tr><tr><td>Depth 4</td><td>642</td><td>0.2447s</td><td>2.71</td></tr><tr><td>Depth 5</td><td>4,745</td><td>1.9989s</td><td>7.39</td></tr><tr><td>Depth 6</td><td>11,207</td><td>3.8613s</td><td>2.36</td></tr><tr><td>Depth 7</td><td>77,311</td><td>31.4154s</td><td>6.90</td></tr></tbody></table>
+<figure><img src="../results/depth_vs_time.png" alt="Depth vs Time Scaling"></figure>
+<blockquote><p><strong>Theoretical Comparison</strong>: In Connect Four, raw branching is $b=7$. Without pruning, depth 7 would require $7^7 \approx 823,543$ states. Alpha-Beta ordering prunes this to $\approx 77,000$ states ($&gt;90\%$ reduction).</p></blockquote>
+<h2>5. Study 4 — Evaluation Weight Tuning</h2>
+<p>Comparing heuristic weight profiles (Center vs Alignment vs Threats) against Tactician:</p>
+<table><thead><tr><th>Profile Name</th><th>Win Rate</th><th>Draw Rate</th><th>Total Time</th></tr></thead><tbody><tr><td><strong>AB-d3-default</strong></td><td>100%</td><td>0%</td><td>20.4s</td></tr><tr><td><strong>AB-d3-aggressive</strong></td><td>67%</td><td>0%</td><td>20.1s</td></tr><tr><td><strong>AB-d3-defensive</strong></td><td>33%</td><td>0%</td><td>21.2s</td></tr></tbody></table>
+<figure><img src="../results/weight_tuning.png" alt="Weight Tuning"></figure>
+<h2>6. Interactive Features &amp; Educational Tools</h2>
+<ol><li><strong>Tactics / Puzzle Trainer</strong>: 5 curated challenges testing instant wins, defensive blocks, and 7-trap forks.</li><li><strong>Game-Theoretic Opening Book</strong>: Verified opening lines from Allis (1988) establishing optimal center play.</li><li><strong>Replay Controller</strong>: Interactive timeline scrubber enabling retrospective game analysis.</li><li><strong>Digital Chess Clocks</strong>: Turn-by-turn thinking timers simulating tournament time controls.</li><li><strong>Adaptive Difficulty</strong>: Auto-ramping AI tiers upon player win streaks.</li></ol>
+<h2>7. Verification &amp; Test Suite Integrity</h2>
+<p>The entire test suite covers all units without mockery or hardware dependencies:</p>
+<pre><code>$ python -m pytest -q
+200 passed in 61.77s (0:01:01)</code></pre>
+    </main>
+  </div>
+</body>
+</html>

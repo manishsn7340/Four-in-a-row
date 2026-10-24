@@ -1,0 +1,61 @@
+Linux is a good choice for this project. Here is the setup for Ubuntu or Debian. If you use another distribution, tell me and I'll change the commands.
+
+## 1. Set up the project
+
+```bash
+mkdir four-in-a-row && cd four-in-a-row
+git init
+python3 -m venv venv
+source venv/bin/activate
+
+pip install pygame numpy matplotlib pandas
+pip freeze > requirements.txt
+
+mkdir game agents gui experiments results report
+touch game/__init__.py agents/__init__.py README.md
+```
+
+Run `source venv/bin/activate` each time you open a new terminal. Check your Python version with `python3 --version`, which should be 3.10 or newer.
+
+## 2. Give Codex the project rules
+
+Codex reads an `AGENTS.md` file in the project root, so put your rules there. This is a starter you can paste:
+
+```markdown
+# Four in a Row AI project
+
+Python 3.10+. Libraries: pygame, numpy, matplotlib, pandas.
+Folders: game/ (board, rules), agents/ (minimax, alphabeta, mcts),
+gui/ (pygame), experiments/ (tournament, ablation, graphs), results/ (CSV, PNG).
+
+Rules:
+
+- Build one layer at a time and stop after each one so I can test it.
+- Every agent has the same function: choose_move(board) -> column.
+- Every search agent reports nodes searched and time taken.
+- Keep code simple and commented, because I must explain it to my professor.
+- Evaluation weights live in one dictionary.
+- Write a small test for each new feature.
+- Fix random seeds for anything random.
+```
+
+## 3. How to work with Codex
+
+Give it **one layer at a time**, in the order from the plan. A good first prompt:
+
+> "Build layer v1: the board and rules in game/board.py (6 rows × 7 columns). Include legal_moves, drop_piece, undo_piece, check_win, is_full. Then write tests in tests/test_board.py covering horizontal, vertical and both diagonal wins. Don't build anything else yet."
+
+After each layer:
+
+1. **Run the tests** and play with it yourself.
+2. **Read the code** and ask Codex (or me) to explain anything you don't understand.
+3. **Commit** with `git commit -am "v1-board-and-rules"` before the next layer.
+
+## Cautions when an AI tool writes the code
+
+- **Check it, don't trust it.** Codex can write code that looks right but is wrong. For Alpha-Beta, confirm it picks the same move as Minimax, and for the transposition table, confirm the moves match the version before it.
+- **You must be able to explain it.** Your professor may ask you to explain or change a function live. Ask Codex for comments, then explain each function back to yourself in simple words.
+- **Check the course rules** on using AI tools, and be ready to say honestly how you used them.
+- **Run the experiments yourself,** so the results and graphs in your report are your own.
+
+You can paste any code or error here as you go, and I'll help you check it, explain it, or debug it. Would you like me to write the first prompts for layers v2 to v4, so you can give them to Codex when you get there?

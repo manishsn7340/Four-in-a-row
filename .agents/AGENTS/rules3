@@ -1,0 +1,270 @@
+# LAYERS.md — the ten build layers
+
+Build in this order. Each layer ends with a working, tested, committed version. Do not
+start a layer until the student asks for it. Read `docs/ARCHITECTURE.md` first, and the
+algorithm spec in `docs/ALGORITHMS.md` for layers v2–v7.
+
+---
+
+## v0 — Project setup
+
+Create the folder layout, `config.py`, empty packages, `requirements.txt`
+(pygame, numpy, matplotlib, pandas, pytest), `README.md` skeleton, `pytest.ini`.
+**Done when:** `pytest` runs (even with zero tests) and imports work.
+
+## v1 — Board and rules (`game/board.py`)
+
+Implement the full Board interface from ARCHITECTURE.md (except `hash`).
+
+- `winner()` checks only the 4 directions through the last placed disc (fast), but
+  `winning_cells()` must return the exact four cells.
+- Reject illegal moves with `ValueError`.
+  **Tests (`tests/test_board.py`):** horizontal, vertical, both diagonals (each for both
+  players); a full board with no winner is a draw; dropping into a full column raises;
+  `undo` restores the exact previous state; `from_string`/`to_string` round-trip;
+  `current_player` alternates correctly; random playouts (seeded, 1000 games) never
+  produce an invalid state and `winner()` agrees with a slow brute-force full-board check.
+  **Do not:** add AI, drawing, or hashing yet.
+
+## v2 — Minimax + baselines (`agents/base.py`, `simple.py`, `minimax.py`, `evaluation.py`)
+
+- `Agent`, `SearchStats`, `RandomAgent`, `GreedyAgent` (takes a win, else blocks, else
+  prefers center).
+- `MinimaxAgent(depth)` exactly as in ALGORITHMS.md §1, using the **basic** evaluation
+  (§5.1: terminal win/loss/draw + simple center bonus). Counts `nodes`, measures time.
+  **Tests:** takes an immediate win; blocks an opponent's immediate win; sees a forced win
+  in 3 plies on a hand-made position; leaves the board unchanged; same seed => same move;
+  beats `RandomAgent` in at least 18 of 20 seeded games at depth 3.
+
+## v3 — Alpha-Beta (`agents/alphabeta.py`)
+
+`AlphaBetaAgent(depth)` with options all **off** (no ordering, no ID, no TT). Same move
+iteration order and same strict-improvement rule as Minimax.
+**Tests:** on 50 seeded positions, root score AND chosen move equal Minimax at depths
+1–4; `nodes` is strictly smaller than Minimax on positions deeper than 4 plies; `cutoffs`
+
+> 0. If scores differ, there is a bug.
+
+## v4 — Move ordering + iterative deepening (`agents/alphabeta.py`)
+
+Add `use_ordering` and `use_iterative_deepening` (+ `time_limit`) per ALGORITHMS.md §2–3.
+**Tests:** with ordering on, root **score** equals plain Alpha-Beta (the chosen move may
+differ only among equal scores); `nodes` drops on average over 30 positions; with a 0.2 s
+time limit the agent always returns a legal move within ~0.3 s; `depth_reached` increases
+with a larger limit; `on_progress` is called once per completed depth.
+
+## v5 — Transposition table (`agents/zobrist.py`, `board.py`, `alphabeta.py`)
+
+Add `Board.hash` (incremental Zobrist) and `TranspositionTable` per ALGORITHMS.md §4.
+Add `use_tt`.
+**Tests:** hash after `drop`+`undo` equals the original; two different move orders that
+reach the same position give the same hash; root score with TT equals root score without
+TT on 30 positions; `tt_hits` > 0 and `nodes` drops; table never exceeds
+`TT_MAX_ENTRIES`; the board is unchanged after search.
+
+## v6 — Better evaluation (`agents/evaluation.py`)
+
+Implement the full evaluation (ALGORITHMS.md §5.2) with weights in one dict `WEIGHTS`.
+Keep the basic evaluation selectable (`weights=None` or `evaluation="basic"`).
+**Tests:** symmetric: `evaluate(board, 1) == -evaluate(board, 2)` for mirrored
+colors; a board with an open three scores higher than one without; hand-made positions
+where the new evaluation prefers the sensible move; in a 40-game seeded match (varied
+openings, both colors) the new evaluation scores at least as well as the basic one.
+Report the actual numbers, do not claim a win that did not happen.
+
+## v7 — MCTS (`agents/mcts.py`)
+
+`MCTSAgent` per ALGORITHMS.md §6.
+**Tests:** beats `RandomAgent` in at least 19 of 20 seeded games; takes an immediate win;
+blocks an immediate loss (with `simulations >= 1000` and light rollout); same seed => same
+move; board unchanged; visit counts sum correctly; more simulations never crashes.
+
+## v8 — GUI (`gui/`)
+
+Follow `docs/FRONTEND.md` exactly. Build in the sub-steps listed there, one at a time,
+and stop after each sub-step so the student can run it.
+**Done when:** a person who has never seen it can play a full game without help, the
+window never freezes while the AI thinks, and the Demo button works.
+
+## v9 — Experiments (`experiments/`)
+
+Follow `docs/EXPERIMENTS.md`: ablation, tournament, depth study, weight tuning,
+plots. Every number comes from real runs and is saved to `results/*.csv`.
+**Done when:** the CSV files and PNG graphs exist, each script has a `--quick` mode
+(20 games / few positions) and a full mode, and `report/notes.md` lists the settings used.
+
+## v10 — Report support, slides support, demo safety
+
+- `report/notes.md` filled with: what each layer does, measured numbers, problems found.
+- `README.md`: install, run the app, run the tests, run each experiment, expected runtime.
+- A `demo` entry point (`python -m gui.app --demo`) that loads a saved position, a low
+  depth, and AI-vs-AI ready to start.
+- `scripts/record_notes.md`: a checklist for the 10-min talk and the 2–3 min demo.
+  **Done when:** a fresh clone can be set up and run following only the README.
+  EOF
+
+cat > docs/ALGORITHMS.md <<'EOF'
+
+# ALGORITHMS.md — exact specifications
+
+Scores are always from the point of view of the **root player** (the player the agent is
+choosing a move for). `WIN_SCORE = 1_000_000`. The root player is MAX; the opponent is MIN.
+Terminal scores include remaining depth so faster wins are preferred and slower losses are
+preferred:
+
+- root player has four in a row: `+(WIN_SCORE + remaining_depth)`
+- opponent has four in a row: `-(WIN_SCORE + remaining_depth)`
+- board full, no winner: `0`
+  (Known simplification: mate-distance scores are depth-relative. Mention it in the report.)
+
+## 1. Minimax (v2)
+
+```
+minimax(board, depth, maximizing):
+    nodes += 1
+    if board.winner() or board.is_full():  return terminal score
+    if depth == 0:                          return evaluate(board, root_player)
+    if maximizing:
+        best = -inf
+        for col in board.legal_moves():     # plain ascending order
+            board.drop(col); v = minimax(board, depth-1, False); board.undo()
+            best = max(best, v)
+        return best
+    else: symmetric with min
+```
+
+Root: loop over `legal_moves()` in ascending order, call `minimax(depth-1, False)`,
+keep the first move with the strictly greatest value. Keep **explicit** max/min (do not
+convert to negamax) so it is easy to explain.
+
+## 2. Alpha-Beta (v3) and move ordering (v4)
+
+Same as Minimax plus `alpha`, `beta`. After evaluating a child:
+`if maximizing: best=max(best,v); alpha=max(alpha,best)`; `else: best=min(best,v);
+beta=min(beta,best)`. `if alpha >= beta: cutoffs += 1; break`.
+
+- Root: pass the running `alpha` to later root moves; update it when a move is strictly
+  better. Use the same strict-improvement rule as Minimax.
+- **Move ordering** (`use_ordering=True`): iterate columns in `MOVE_ORDER = [3,2,4,1,5,0,6]`
+  filtered to legal columns. With a transposition table (v5), try the TT best move first.
+  With iterative deepening, try the previous iteration's best move first at the root.
+- **Tie-breaking:** equal-score moves may differ when ordering changes. Tests compare the
+  root **score**, not necessarily the move, once ordering is on.
+
+## 3. Iterative deepening (v4)
+
+```
+best_move = first legal move (so we always have an answer)
+for depth in 1..max_depth:
+    try: move, score = search(depth)      # root move order: previous best first
+         best_move = move; stats.depth_reached = depth; call on_progress(...)
+         if abs(score) >= WIN_SCORE: break   # forced win/loss found, deeper is pointless
+    except SearchTimeout: break              # discard the unfinished depth
+return best_move
+```
+
+- Time check: every 1024 nodes compare `time.perf_counter()` to the deadline and raise
+  `SearchTimeout` (a private exception). Never use sleeps or threads inside the agent.
+- `max_depth` = the agent's `depth` parameter. `time_limit=None` means no time limit
+  (used for fair ablation at fixed depth).
+
+## 4. Transposition table with Zobrist hashing (v5)
+
+**Zobrist:** one random 64-bit integer per (row, col, player) = 6*7*2 numbers, generated
+with `random.Random(ZOBRIST_SEED)`. `Board.hash` is the XOR of the numbers of all discs;
+update by XOR-ing in `drop` and again in `undo`. (The side to move is implied by the disc
+count, so no extra side key is needed.)
+
+**Entry:** `(key, depth, score, flag, best_move)`; `flag` in `{EXACT, LOWER, UPPER}`.
+
+```
+at node entry (with original_alpha = alpha, original_beta = beta):
+    e = tt.get(board.hash)
+    if e and e.depth >= depth:
+        if e.flag == EXACT:  tt_hits+=1; return e.score
+        if e.flag == LOWER:  alpha = max(alpha, e.score)
+        if e.flag == UPPER:  beta  = min(beta,  e.score)
+        if alpha >= beta:    tt_hits+=1; return e.score
+at node exit, after computing best:
+    flag = UPPER if best <= original_alpha
+           LOWER if best >= original_beta
+           EXACT otherwise
+    tt.store(board.hash, depth, best, flag, best_move)
+```
+
+- The table is only valid for one root player and one evaluation setup. Store
+  `root_player` in the table and clear it when it changes.
+- Size limit `TT_MAX_ENTRIES`: replace an existing entry only if the new one has depth >=
+  the old one; when the table is full and the key is new, evict by clearing the oldest
+  half or simply refuse to insert. Keep the rule simple and document it.
+- Verify correctness: root score with and without the TT must be equal. If not, the bound
+  flags are wrong.
+
+## 5. Evaluation (v2 basic, v6 full)
+
+### 5.1 Basic (v2)
+
+Terminal scores as above. Non-terminal: `3 * (my discs in the center column - opponent
+discs in the center column)`.
+
+### 5.2 Full (v6)
+
+Use all **69 windows of four** (24 horizontal, 21 vertical, 24 diagonal). For each window
+count `mine`, `theirs`, `empty`. Skip windows containing both colors. Score from the root
+player's perspective with a weights dict:
+
+```python
+WEIGHTS = {
+    "center": 3,          # per disc in the center column (mine minus theirs)
+    "two": 2,             # window: 2 mine + 2 empty
+    "three": 5,           # window: 3 mine + 1 empty
+    "opp_two": -2,
+    "opp_three": -6,      # must be larger in size than "three": blocking matters
+    "playable_three": 8,  # extra if the empty cell of a 3-window can be played right now
+    "double_threat": 40,  # two different playable winning cells for the same player
+}
+```
+
+- "Double threat" = a player has two distinct cells that complete four and both are
+  playable or stacked directly above each other; keep the detection simple and document it.
+- All weights live in this single dict so layer v9 can tune them. `evaluate(board, player,
+weights=WEIGHTS)` returns a number; it must be antisymmetric between players.
+
+## 6. MCTS (v7)
+
+Tree node: `move`, `parent`, `children`, `untried_moves`, `visits`, `wins` where `wins`
+is counted from the point of view of the player who made `move` (draws count 0.5).
+Each iteration:
+
+1. **Selection:** from the root, while the node has no untried moves and has children,
+   go to the child maximizing `wins/visits + C * sqrt(ln(parent.visits) / visits)`
+   (UCB1, `C = 1.41`).
+2. **Expansion:** if untried moves remain, pick one with the agent's seeded RNG, drop it,
+   add a child.
+3. **Simulation (rollout):** play to the end. `rollout="random"`: random legal moves.
+   `rollout="light"`: take an immediate win if available, else block an immediate opponent
+   win, else random.
+4. **Backpropagation:** walk up, add result, flip perspective at each level.
+
+- Work on a **copy** of the board per iteration or use drop/undo carefully; never mutate
+  the caller's board.
+- Stop after `simulations` iterations or `time_limit` seconds. Choose the child with the
+  **most visits**.
+- Use `rng = random.Random(seed)`. Fill `column_scores` with each root child's win rate
+  and `simulations` in stats. Call `on_progress` every ~200 simulations.
+- If an immediate winning move exists at the root, MCTS may return it directly (document
+  it); do not make MCTS stronger than specified in other ways.
+
+## 7. Hint analysis (used by the GUI, `gui/hint.py`)
+
+`analyze(board, agent_or_depth)`: for each legal root move, search with a **full window**
+(no alpha cutoff across root moves) to get an exact score per column. Returns
+`{col: score}` and a rule-based reason for the best move, chosen in this priority order:
+
+1. "Wins immediately."
+2. "Blocks the opponent's winning move."
+3. "Creates a winning threat the opponent must answer."
+4. "Avoids giving the opponent a win on the next move."
+5. "Takes the center / builds toward four." (fallback)
+   Reasons must be computed from the board, not invented by guesswork.
+   EOF

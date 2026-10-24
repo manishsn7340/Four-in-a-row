@@ -1,0 +1,86 @@
+# Frontend Design Plan
+
+The frontend is the **Pygame app** from layer v8. It is what your professor sees in the demo, so it should look polished and show the AI's thinking, not only the board.
+
+## Concept: "Connect Four Lab"
+
+Present it as a **strategy coach with a live view into the AI's mind**. Most student projects show only the board. Yours also shows what the AI is thinking, and that is the part people remember.
+
+## Look and feel
+
+- **Style:** dark, modern "arcade lab". A deep navy background, a glass-like blue board with round holes, and soft glowing discs.
+- **Colors:** you are coral, the AI is gold, and the highlights are teal. Make sure the two disc colors are easy to tell apart. Add a small symbol on each disc (a dot for you, a ring for the AI) so it also works for color-blind viewers and on a projector.
+- **Fonts:** one clean font for text and one bold font for headings. Load them from the `.ttf` file in the project so it looks the same on every computer.
+- **Contrast:** use large text and strong contrast, because projectors wash out colors.
+
+## Screen layout
+
+```
+┌───────────────────────────────────────────────────────┐
+│  Connect Four Lab        [Agent ▾] [Level ▾] [Menu]   │
+├─────────────────────────────┬─────────────────────────┤
+│                             │  Evaluation bar         │
+│                             │  ▓▓▓▓▓▓░░░░  (who leads)│
+│        BOARD                │                         │
+│     (7 columns,             │  Live stats             │
+│      column score           │  Positions: 12,480      │
+│      numbers above)         │  Pruned:    8,310       │
+│                             │  Time:      0.42 s      │
+│                             │  Depth:     6           │
+│                             │                         │
+│                             │  Thinking panel         │
+│                             │  (move scores per col)  │
+├─────────────────────────────┴─────────────────────────┤
+│ [Undo] [Hint] [New game] [AI vs AI]   Status message  │
+└───────────────────────────────────────────────────────┘
+```
+
+## Screens
+
+1. **Start menu:** title, buttons for Play, AI vs AI, Results, and Quit. A small animated background, such as discs slowly falling.
+2. **Game screen:** the layout above.
+3. **AI vs AI screen:** two agents side by side, each with their own stats panel, plus a speed slider.
+4. **Results screen:** shows your experiment graphs (speedup, win rates) inside the app, loaded from the PNG files in `results/`. This links the app to your report.
+5. **Game over:** a clear win or draw banner with a Rematch button.
+
+## Creative features that make it interesting
+
+1. **Disc drop animation:** discs fall with gravity and a small bounce.
+2. **Win celebration:** the four winning discs pulse and a glowing line connects them.
+3. **Evaluation bar:** a bar showing who is ahead, which moves smoothly after each move.
+4. **Column score hint:** when you press Hint, a number appears above each column showing how good that move is. The best column glows, with a one-line reason below the board, such as "blocks the opponent's three".
+5. **"AI thinking" view:** while it searches, the panel shows the current depth and the best move so far, so the audience sees iterative deepening happen.
+6. **Pruning counter:** a bar that fills as branches are skipped. It makes Alpha-Beta easy to understand.
+7. **Mini search tree (stretch):** a small drawing of the top few moves and their scores.
+8. **Replay slider:** after a game, drag to go back through the moves.
+9. **Agent personalities:** name the AIs, such as "Rookie" (depth 2), "Tactician" (Alpha-Beta), and "Gambler" (MCTS). This makes difficulty levels feel more like characters.
+10. **Optional sound:** a soft click on a move and a tone on a win, with a mute button.
+
+## Demo mode
+
+Add one **"Demo" button** that sets up your 2-3 minute demo automatically: a saved position, low search depth, and AI vs AI ready to start. It removes the risk of fumbling with menus in front of your professor.
+
+## How to build it in Pygame
+
+- **Separate drawing from game logic.** The GUI only calls `choose_move(board)` and draws the result.
+- **Run the AI in a separate thread,** so the window stays smooth while it thinks.
+- **Draw at 60 FPS** with a clock, and use easing functions for smooth motion.
+- **Pre-draw the static board once** as a surface, and only redraw what moves.
+- **Keep all colors, fonts and sizes in one `theme.py` file,** so you can change the look in one place.
+- **Make the window resizable or use a fixed 1280×720 size,** and test on the projector or a second screen before the demo.
+
+## Build order for the frontend (inside layer v8)
+
+1. Window, board, and click to drop a disc.
+2. Theme file, colors and fonts.
+3. Drop animation and win highlight.
+4. Agent and difficulty menus.
+5. Live stats and evaluation bar.
+6. Undo and AI vs AI.
+7. Hint with column scores and the reason.
+8. Results screen and demo button.
+9. Optional extras: sound, replay slider, mini search tree.
+
+If you are short on time, do steps 1 to 5 and 8. Those give you the biggest visual effect for the least work.
+
+Do you want me to write the Codex prompts for the frontend, one per step above, so you can paste them in order?
