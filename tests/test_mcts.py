@@ -2,26 +2,20 @@
 
 from __future__ import annotations
 
-import random
-
 from agents.mcts import MCTSAgent
 from agents.simple import RandomAgent
 from game.board import Board
+from helpers import snapshot
 
 
-def _play_game(a1: MCTSAgent, a2: RandomAgent, seed: int) -> int:
-    """Play one seeded game; return winner (0=draw)."""
-    rng = random.Random(seed)
+def _play_game(a1: MCTSAgent, a2: RandomAgent) -> int:
+    """Play one game with a1 moving first; return the winner (0 = draw)."""
     board = Board()
     while not board.is_terminal():
         agent = a1 if board.current_player() == 1 else a2
         col = agent.choose_move(board)
         board.drop(col)
     return board.winner()
-
-
-def _snapshot(board: Board) -> tuple:
-    return tuple(tuple(r) for r in board.grid), tuple(board.move_history)
 
 
 # --- beats RandomAgent 19/20 seeded games ---
@@ -31,7 +25,7 @@ def test_mcts_beats_random_19_of_20() -> None:
     for seed in range(20):
         mcts = MCTSAgent(simulations=800, seed=seed)
         rand = RandomAgent(seed=seed + 100)
-        if _play_game(mcts, rand, seed) == 1:
+        if _play_game(mcts, rand) == 1:
             wins += 1
     assert wins >= 19, f"MCTS won only {wins}/20 games"
 
@@ -50,14 +44,13 @@ def test_takes_immediate_win() -> None:
 # --- blocks an immediate loss ---
 
 def test_blocks_immediate_loss() -> None:
-    # P2 has three in a row at cols 1,2,3; P1 to move must block col 4 or col 0
+    # P2 has three in a row in columns 1-3; column 0 is already taken, so only 4 blocks.
     board = Board()
     for p1c, p2c in [(6, 1), (5, 2), (0, 3)]:
         board.drop(p1c)
         board.drop(p2c)
     agent = MCTSAgent(simulations=1500, rollout="light", seed=42)
     move = agent.choose_move(board)
-    # either col 0 or col 4 blocks the OOO (col 0 or right-extension col 4)
     assert move == 4
 
 
@@ -77,9 +70,9 @@ def test_board_unchanged() -> None:
     board = Board()
     for col in [3, 2, 4, 1, 5, 0]:
         board.drop(col)
-    before = _snapshot(board)
+    before = snapshot(board)
     MCTSAgent(simulations=300, seed=42).choose_move(board)
-    assert _snapshot(board) == before
+    assert snapshot(board) == before
 
 
 # --- visit counts sum correctly ---
@@ -88,7 +81,6 @@ def test_visit_counts() -> None:
     board = Board()
     agent = MCTSAgent(simulations=400, seed=42)
     agent.choose_move(board)
-    # column_scores contains one entry per root child expanded
     assert agent.last_stats.column_scores is not None
     assert agent.last_stats.simulations == 400
 

@@ -4,11 +4,8 @@ from __future__ import annotations
 
 from config import WIN_SCORE
 from game.board import Board
+from helpers import snapshot
 from gui.hint import analyze
-
-
-def snapshot(board: Board) -> tuple[tuple[tuple[int, ...], ...], tuple[int, ...]]:
-    return tuple(tuple(row) for row in board.grid), tuple(board.move_history)
 
 
 def test_hint_empty_board_returns_scores_and_restores_board() -> None:

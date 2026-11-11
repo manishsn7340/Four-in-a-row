@@ -1,113 +1,65 @@
-"""gui/sound.py — Procedural audio synthesis for Connect Four.
-
-Generates soft, pleasant sound effects dynamically using numpy and pygame.mixer.
-No external audio files or dependencies required.
-Safely handles environments without audio devices.
-"""
+"""Sound effects synthesised with numpy, so the project needs no audio files."""
 
 from __future__ import annotations
 
 import numpy as np
 import pygame
 
+RATE = 44100
+
+
+def _tone(duration: float, wave) -> pygame.mixer.Sound:
+    """Turn wave(t) (values roughly in [-1, 1]) into a stereo pygame Sound."""
+    t = np.linspace(0, duration, int(RATE * duration), False)
+    samples = (wave(t) * 24000).astype(np.int16)
+    return pygame.sndarray.make_sound(np.repeat(samples[:, None], 2, axis=1))
+
+
+def _arpeggio(t: np.ndarray) -> np.ndarray:
+    """C major chord with each note starting 70 ms after the previous one."""
+    out = np.zeros_like(t)
+    for i, freq in enumerate((523.25, 659.25, 783.99, 1046.50)):
+        s = np.clip(t - i * 0.07, 0, None)
+        out += np.where(t >= i * 0.07, np.sin(2 * np.pi * freq * s) * np.exp(-s * 7), 0) * 0.27
+    return out
+
 
 class SoundManager:
-    """Manages procedural sound effects with mute toggle and safe fallbacks."""
-
     def __init__(self) -> None:
-        self.enabled = False
         self.muted = False
-        self._snd_drop: pygame.mixer.Sound | None = None
-        self._snd_hint: pygame.mixer.Sound | None = None
-        self._snd_win: pygame.mixer.Sound | None = None
-        self._snd_click: pygame.mixer.Sound | None = None
-
+        self.sounds: dict[str, pygame.mixer.Sound] = {}
         try:
             if not pygame.mixer.get_init():
-                pygame.mixer.init(frequency=44100, size=-16, channels=2, buffer=512)
-            self._generate_sounds()
-            self.enabled = True
-        except Exception:
-            # Headless or missing audio device — fail silently without crashing
-            self.enabled = False
+                pygame.mixer.init(frequency=RATE, size=-16, channels=2, buffer=512)
+            self.sounds = {
+                # a low thud whose pitch falls quickly
+                "drop": (_tone(0.09, lambda t: np.sin(2 * np.pi * 220 * np.exp(-15 * t) * t) * np.exp(-45 * t)), 0.35),
+                "hint": (_tone(0.16, lambda t: (0.6 * np.sin(2 * np.pi * 659.25 * t)
+                                               + 0.4 * np.sin(2 * np.pi * 987.77 * t)) * np.exp(-18 * t) * 0.8), 0.30),
+                "win": (_tone(0.45, _arpeggio), 0.40),
+                "click": (_tone(0.03, lambda t: np.sin(2 * np.pi * 800 * t) * np.exp(-100 * t) * 0.6), 0.20),
+            }
+            for sound, volume in self.sounds.values():
+                sound.set_volume(volume)
+        except pygame.error:
+            self.sounds = {}  # no audio device (e.g. headless): play silently
 
-    def _generate_sounds(self) -> None:
-        sr = 44100
-
-        # 1. Soft disc drop: warm thud with exponential decay
-        t_drop = np.linspace(0, 0.09, int(sr * 0.09), False)
-        decay_drop = np.exp(-t_drop * 45)
-        freq_drop = 220.0 * np.exp(-t_drop * 15)
-        wave_drop = np.sin(2 * np.pi * freq_drop * t_drop) * decay_drop * 24000
-        stereo_drop = np.repeat(wave_drop.astype(np.int16)[:, None], 2, axis=1)
-        self._snd_drop = pygame.sndarray.make_sound(stereo_drop)
-        self._snd_drop.set_volume(0.35)
-
-        # 2. Hint chime: two crystalline bell harmonic frequencies
-        dur_hint = 0.16
-        t_hint = np.linspace(0, dur_hint, int(sr * dur_hint), False)
-        decay_hint = np.exp(-t_hint * 18)
-        wave_hint = (
-            np.sin(2 * np.pi * 659.25 * t_hint) * 0.6  # E5
-            + np.sin(2 * np.pi * 987.77 * t_hint) * 0.4  # B5
-        ) * decay_hint * 20000
-        stereo_hint = np.repeat(wave_hint.astype(np.int16)[:, None], 2, axis=1)
-        self._snd_hint = pygame.sndarray.make_sound(stereo_hint)
-        self._snd_hint.set_volume(0.30)
-
-        # 3. Win chime: uplifting major chord arpeggio (C5 -> E5 -> G5 -> C6)
-        dur_win = 0.45
-        t_win = np.linspace(0, dur_win, int(sr * dur_win), False)
-        notes = [523.25, 659.25, 783.99, 1046.50]
-        chord = np.zeros_like(t_win)
-        for i, f in enumerate(notes):
-            t_offset = max(0.0, i * 0.07)
-            mask = t_win >= t_offset
-            sub_t = t_win[mask] - t_offset
-            env = np.exp(-sub_t * 7)
-            chord[mask] += np.sin(2 * np.pi * f * sub_t) * env * 0.25
-        wave_win = chord * 26000
-        stereo_win = np.repeat(wave_win.astype(np.int16)[:, None], 2, axis=1)
-        self._snd_win = pygame.sndarray.make_sound(stereo_win)
-        self._snd_win.set_volume(0.40)
-
-        # 4. Soft UI click
-        t_clk = np.linspace(0, 0.03, int(sr * 0.03), False)
-        decay_clk = np.exp(-t_clk * 100)
-        wave_clk = np.sin(2 * np.pi * 800 * t_clk) * decay_clk * 14000
-        stereo_clk = np.repeat(wave_clk.astype(np.int16)[:, None], 2, axis=1)
-        self._snd_click = pygame.sndarray.make_sound(stereo_clk)
-        self._snd_click.set_volume(0.20)
+    def _play(self, name: str) -> None:
+        if name in self.sounds and not self.muted:
+            self.sounds[name][0].play()
 
     def play_drop(self) -> None:
-        if self.enabled and not self.muted and self._snd_drop:
-            try:
-                self._snd_drop.play()
-            except Exception:
-                pass
+        self._play("drop")
 
     def play_hint(self) -> None:
-        if self.enabled and not self.muted and self._snd_hint:
-            try:
-                self._snd_hint.play()
-            except Exception:
-                pass
+        self._play("hint")
 
     def play_win(self) -> None:
-        if self.enabled and not self.muted and self._snd_win:
-            try:
-                self._snd_win.play()
-            except Exception:
-                pass
+        self._play("win")
 
     def play_click(self) -> None:
-        if self.enabled and not self.muted and self._snd_click:
-            try:
-                self._snd_click.play()
-            except Exception:
-                pass
+        self._play("click")
 
     def toggle_mute(self) -> bool:
-        """Toggle mute state and return the new muted status."""
         self.muted = not self.muted
         return self.muted

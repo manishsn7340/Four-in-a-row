@@ -7,14 +7,7 @@ import random
 import pytest
 
 from game.board import Board
-
-
-def play(columns: list[int]) -> Board:
-    """Play a sequence of legal columns and return the resulting board."""
-    board = Board()
-    for col in columns:
-        board.drop(col)
-    return board
+from helpers import play
 
 
 def slow_winner(board: Board) -> int:

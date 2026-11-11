@@ -1,95 +1,82 @@
-# Four in a Row AI — Strategy Coach & Benchmark Report
+# Four in a Row AI — Strategy Coach and Benchmark Report
 
-**Date:** October 24, 2026  |  **Course:** Artificial Intelligence Lab  |  **Environment:** Python 3.10+, Pygame, NumPy
+**Date:** October 24, 2026  |  **Course:** Artificial Intelligence Lab
 
 ---
 
-## 1. Executive Summary & System Architecture
+## 1. System overview
 
-This project presents a high-performance **Connect Four (Four in a Row)** strategy engine and playable AI coach.
-The system is engineered in modular, testable layers adhering to strict clean-code contracts:
+- **Board**: a 6×7 grid stored as a Python list-of-lists with a move history and an incremental Zobrist hash. A win is checked only along the four lines through the last move.
+- **Search**: Minimax, Alpha-Beta with centre-first move ordering, iterative deepening with a time limit, and a transposition table.
+- **MCTS**: Monte Carlo Tree Search with the UCB1 selection rule (c = 1.41).
+- **GUI**: a Pygame strategy coach with an evaluation bar, hints with a one-line reason, an opening book, per-player clocks, puzzles and a replay slider.
 
-- **Game Representation**: Standard 7×6 gravity grid stored as a Python list-of-lists, with move history and an incremental 64-bit Zobrist hash. Win checks inspect the four directions through the last move.
-- **Search Algorithms**: Minimax baseline, Alpha-Beta pruning with dynamic center-first move ordering, Iterative Deepening with strict clock budgets, and Zobrist Hashing Transposition Tables.
-- **Probabilistic MCTS**: Monte Carlo Tree Search utilizing Upper Confidence bounds applied to Trees (UCT, $c = \sqrt{2}$).
-- **Strategy Coach GUI**: Pygame-based dark-space user interface featuring real-time evaluation bars, tactical hints with plain-language reasoning, opening book lookup (Allis 1988), chess clocks, and post-game replay scrubbing.
+## 2. Study 1 — Ablation
 
-## 2. Study 1 — Algorithmic Ablation Analysis
+Each row adds one feature; all play at depth 3 against Rookie (Alpha-Beta depth 2).
 
-Evaluates search techniques against a fixed baseline agent (*Rookie: AlphaBeta depth 2*):
+| Agent | Positions searched / move | Win rate | Wins / games | Draw rate | Match time |
+|:---|:---:|:---:|:---:|:---:|:---:|
+| **Minimax-d3** | 233 | 50% | 10/20 | 0% | 4.10s |
+| **AB-d3** | 113 | 50% | 10/20 | 0% | 2.04s |
+| **AB-d3+ord** | 85 | 45% | 9/20 | 0% | 1.60s |
+| **AB-d3+ID** | 96 | 55% | 11/20 | 0% | 1.81s |
+| **AB-d3+TT** | 78 | 45% | 9/20 | 0% | 1.36s |
 
-| Agent Configuration | Win Rate | Wins / Total | Draw Rate | Total Time |
-|:---|:---:|:---:|:---:|:---:|
-| **Minimax-d3** | 0% | 0/3 | 0% | 0.43s |
-| **AB-d3** | 67% | 2/3 | 0% | 2.72s |
-| **AB-d3+ord** | 0% | 0/3 | 0% | 2.19s |
-| **AB-d3+ID** | 33% | 1/3 | 0% | 2.65s |
-| **AB-d3+TT** | 0% | 0/3 | 0% | 1.86s |
+> **Result**: at the same depth, Alpha-Beta searched 52% fewer positions per move than Minimax.
 
 ![Ablation Study](../results/ablation.png)
 
-> **Insight**: Alpha-Beta pruning eliminates over 75% of search tree nodes compared to pure Minimax at equivalent depth without altering the optimal decision.
+## 3. Study 2 — Tournament
 
-## 3. Study 2 — Round-Robin Tournament Hierarchy
+Every pair of agents plays. Each pair of games starts from a random 4-move opening, played once with each agent moving first.
 
-Pairwise round-robin matches between all primary agent archetypes:
-
-| Matchup (P1 vs P2) | P1 Win % | P2 Win % | Draw % | Total Match Time |
+| Match | Win % (first named) | Win % (second named) | Draw % | Match time |
 |:---|:---:|:---:|:---:|:---:|
-| **Rookie** vs **Tactician** | 0% | 100% | 0% | 14.0s |
-| **Rookie** vs **Grandmaster** | 0% | 33% | 67% | 68.6s |
-| **Rookie** vs **Gambler** | 100% | 0% | 0% | 2.5s |
-| **Tactician** vs **Grandmaster** | 0% | 100% | 0% | 92.1s |
-| **Tactician** vs **Gambler** | 67% | 33% | 0% | 19.7s |
-| **Grandmaster** vs **Gambler** | 100% | 0% | 0% | 66.4s |
+| **Rookie** vs **Tactician** | 15% | 85% | 0% | 10.8s |
+| **Rookie** vs **Grandmaster** | 20% | 80% | 0% | 107.0s |
+| **Rookie** vs **Gambler** | 45% | 50% | 5% | 9.7s |
+| **Tactician** vs **Grandmaster** | 15% | 80% | 5% | 119.4s |
+| **Tactician** vs **Gambler** | 85% | 15% | 0% | 19.7s |
+| **Grandmaster** vs **Gambler** | 70% | 30% | 0% | 112.2s |
+
+> **Ranking by total wins**: Grandmaster (46), Tactician (37), Gambler (19), Rookie (16).
 
 ![Tournament Results](../results/tournament.png)
 
-> **Skill Hierarchy**: $\text{Grandmaster (d=7)} > \text{Tactician (d=5)} > \text{Rookie (d=2)} > \text{Gambler (MCTS)}$. Deep tactical lookahead dominates heuristic play.
+## 4. Study 3 — Depth vs time
 
-## 4. Study 3 — Depth vs Time Exponential Scaling
+Alpha-Beta from one fixed mid-game position at depths 1 to 7.
 
-Empirical verification of game-tree node expansion across depths $d=1$ to $d=7$:
-
-| Search Depth | Nodes Evaluated | Avg Move Time | Effective Branching Factor ($b$) |
+| Depth | Positions searched | Time per move | Growth vs previous depth |
 |:---:|:---:|:---:|:---:|
-| Depth 1 | 7 | 0.0037s | - |
-| Depth 2 | 27 | 0.0121s | 3.86 |
-| Depth 3 | 237 | 0.1043s | 8.78 |
-| Depth 4 | 642 | 0.2447s | 2.71 |
-| Depth 5 | 4,745 | 1.9989s | 7.39 |
-| Depth 6 | 11,207 | 3.8613s | 2.36 |
-| Depth 7 | 77,311 | 31.4154s | 6.90 |
+| 1 | 7 | 0.0005s | - |
+| 2 | 27 | 0.0017s | 3.86x |
+| 3 | 237 | 0.0146s | 8.78x |
+| 4 | 642 | 0.0352s | 2.71x |
+| 5 | 4,745 | 0.2863s | 7.39x |
+| 6 | 11,207 | 0.5706s | 2.36x |
+| 7 | 77,311 | 4.5508s | 6.90x |
 
-![Depth vs Time Scaling](../results/depth_vs_time.png)
+> **Result**: each extra level of depth multiplied the work by about 4.7 on average (a full tree would grow by 7 per level).
 
-> **Theoretical Comparison**: In Connect Four, raw branching is $b=7$. Without pruning, depth 7 would require $7^7 \approx 823,543$ states. Alpha-Beta ordering prunes this to $\approx 77,000$ states ($>90\%$ reduction).
+![Depth vs Time](../results/depth_vs_time.png)
 
-## 5. Study 4 — Evaluation Weight Tuning
+## 5. Study 4 — Evaluation weights
 
-Comparing heuristic weight profiles (Center vs Alignment vs Threats) against Tactician:
+Three weight sets at depth 3 against Tactician (depth 5).
 
-| Profile Name | Win Rate | Draw Rate | Total Time |
+| Weight set | Win rate | Draw rate | Match time |
 |:---|:---:|:---:|:---:|
-| **AB-d3-default** | 100% | 0% | 20.4s |
-| **AB-d3-aggressive** | 67% | 0% | 20.1s |
-| **AB-d3-defensive** | 33% | 0% | 21.2s |
+| **default** | 22% | 5% | 22.2s |
+| **aggressive** | 20% | 5% | 22.9s |
+| **defensive** | 23% | 3% | 21.2s |
 
 ![Weight Tuning](../results/weight_tuning.png)
 
-## 6. Interactive Features & Educational Tools
-
-1. **Tactics / Puzzle Trainer**: 5 curated challenges testing instant wins, defensive blocks, and 7-trap forks.
-2. **Game-Theoretic Opening Book**: Verified opening lines from Allis (1988) establishing optimal center play.
-3. **Replay Controller**: Interactive timeline scrubber enabling retrospective game analysis.
-4. **Digital Chess Clocks**: Turn-by-turn thinking timers simulating tournament time controls.
-5. **Adaptive Difficulty**: Auto-ramping AI tiers upon player win streaks.
-
-## 7. Verification & Test Suite Integrity
-
-The entire test suite covers all units without mockery or hardware dependencies:
+## 6. Tests
 
 ```bash
 $ python -m pytest -q
-200 passed in 61.77s (0:01:01)
+202 passed in 14.22s
 ```

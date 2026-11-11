@@ -13,7 +13,7 @@ import pytest
 
 from game.board import Board
 from gui import theme as T
-from gui.animation import ConfettiBurst, DiscDrop, Starfield, WinPulse, _bounce_out, _cell_center
+from gui.animation import ConfettiBurst, DiscDrop, WinPulse, _bounce_out
 from gui.app import (
     MODE_AVAI,
     MODE_HVA,
@@ -112,14 +112,6 @@ def test_bounce_easing():
     assert pytest.approx(_bounce_out(1.0), abs=1e-3) == 1.0
 
 
-def test_starfield():
-    s = Starfield(30)
-    assert len(s.stars) == 30
-    s.update(0.1)
-    surf = pygame.Surface((T.WIN_W, T.WIN_H))
-    s.draw(surf)
-
-
 def test_disc_drop_animation():
     drop = DiscDrop(col=3, row=0, color=T.P1_DISC)
     assert not drop.done
@@ -186,11 +178,9 @@ def test_procedural_icons():
         make_bulb_icon,
         make_chart_icon,
         make_demo_icon,
-        make_human_icon,
-        make_robot_icon,
         make_sound_icon,
     )
-    for fn in (make_bulb_icon, make_chart_icon, make_demo_icon, make_human_icon, make_robot_icon):
+    for fn in (make_bulb_icon, make_chart_icon, make_demo_icon):
         surf = fn()
         assert surf.get_width() > 0 and surf.get_height() > 0
 
@@ -210,52 +200,9 @@ def test_opening_book():
     assert lookup([0, 1, 2, 3, 4, 5, 6]) is None
 
 
-def test_replay_manager(tmp_path):
-    from gui.replay import ReplayManager
-    rm = ReplayManager()
-    assert rm.total_moves == 0
-    assert not rm.active
-
-    rm.record(3)
-    rm.record(2)
-    rm.record(3)
-    assert rm.total_moves == 3
-
-    rm.activate()
-    assert rm.active
-    assert rm.step == 3
-
-    # Clamping
-    rm.step = -5
-    assert rm.step == 0
-    rm.step = 100
-    assert rm.step == 3
-
-    # Board reconstruction
-    b0 = rm.board_at_step(0)
-    assert len(b0.move_history) == 0
-    b2 = rm.board_at_step(2)
-    assert len(b2.move_history) == 2
-
-    # Export
-    out = rm.export(str(tmp_path))
-    assert os.path.exists(out)
-    with open(out) as f:
-        content = f.read()
-    assert "moves: 3 2 3" in content
-
-    # Clear
-    rm.clear()
-    assert rm.total_moves == 0
-    assert not rm.active
-
 
 def test_extra_icons_and_avatars():
-    from gui.icons import draw_agent_avatar, make_clock_icon, make_export_icon, make_puzzle_icon
-    clk = make_clock_icon()
-    assert clk.get_width() > 0
-    exp = make_export_icon()
-    assert exp.get_width() > 0
+    from gui.icons import draw_agent_avatar, make_puzzle_icon
     puz = make_puzzle_icon()
     assert puz.get_width() > 0
 
@@ -265,7 +212,7 @@ def test_extra_icons_and_avatars():
 
 
 def test_wrap_text_and_puzzle_banner():
-    from gui.app import draw_puzzle_banner, wrap_text
+    from gui.banner import draw_puzzle_banner, wrap_text
     fonts = T.load_fonts()
     sample = "Player 2 is about to win vertically. Find the only legal move that prevents defeat."
     lines = wrap_text(fonts["sm"], sample, 320)

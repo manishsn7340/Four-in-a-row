@@ -8,23 +8,7 @@ from agents.minimax import MinimaxAgent
 from agents.simple import GreedyAgent, RandomAgent
 from config import GLOBAL_SEED, WIN_SCORE
 from game.board import Board
-
-
-def play(columns: list[int]) -> Board:
-    """Play a legal sequence of columns and return the resulting board."""
-    board = Board()
-    for col in columns:
-        board.drop(col)
-    return board
-
-
-def snapshot(board: Board) -> tuple[tuple[tuple[int, ...], ...], tuple[int, ...], int]:
-    """Capture all public board state that search must restore."""
-    return (
-        tuple(tuple(row) for row in board.grid),
-        tuple(board.move_history),
-        board.current_player(),
-    )
+from helpers import play, snapshot
 
 
 def test_search_stats_start_with_empty_measurements() -> None:

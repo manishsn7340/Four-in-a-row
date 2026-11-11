@@ -2,33 +2,18 @@
 
 from __future__ import annotations
 
-import random
 from time import perf_counter
 
 from agents.alphabeta import AlphaBetaAgent
 from game.board import Board
-
-
-def seeded_positions(count: int) -> list[Board]:
-    """Create reproducible non-terminal positions for ordering comparisons."""
-    rng = random.Random(271828)
-    positions: list[Board] = []
-    while len(positions) < count:
-        board = Board()
-        for _ in range(rng.randint(6, 18)):
-            if board.is_terminal():
-                break
-            board.drop(rng.choice(board.legal_moves()))
-        if not board.is_terminal():
-            positions.append(board)
-    return positions
+from helpers import seeded_positions
 
 
 def test_move_ordering_preserves_scores_and_reduces_average_nodes() -> None:
     """Keep the same root scores while center-first order lowers total work."""
     plain_nodes = 0
     ordered_nodes = 0
-    for position in seeded_positions(30):
+    for position in seeded_positions(30, 271828, 6, 18):
         plain = AlphaBetaAgent(depth=5, use_ordering=False)
         ordered = AlphaBetaAgent(depth=5, use_ordering=True)
 

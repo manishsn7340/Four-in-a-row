@@ -1,72 +1,119 @@
 # Four in a Row AI
 
-A university AI project that develops a Connect Four strategy coach in small,
-tested layers. It will include Minimax, Alpha-Beta search, MCTS, a Pygame
-interface, and reproducible experiments.
+A Connect Four strategy coach built for the Artificial Intelligence Lab. It
+implements and compares classic game-playing algorithms (Minimax, Alpha-Beta
+pruning with its standard optimisations, and Monte Carlo Tree Search) and puts
+them inside a playable Pygame application that explains its reasoning.
 
-## Current status
+## Features
 
-- **Game Engine & Rules**: Bitboard/array-based board representation, victory detection, and move undo/redo.
-- **Search Agents**:
-  - Minimax with depth cutoff and heuristic evaluation
-  - Alpha-Beta Pruning with move ordering
-  - Iterative Deepening with time budgets
-  - Zobrist Hashing & Transposition Table
-  - Monte Carlo Tree Search (MCTS / UCT)
-- **Frontend / Strategy Coach (`gui/app.py`)**:
-  - **Modes**: Human vs AI (`Human vs AI`), Pass & Play 2-Player (`2-Player`), and AI vs AI (`AI vs AI`).
-  - **Strategy Coach**: Real-time evaluation bar, one-click tactical hints with plain-language explanations.
-  - **Visuals & Avatars**: Procedural geometric avatars (Rookie, Tactician, Grandmaster, Gambler), deep-space nebula gradient, twinkling starfield, physical drop bounce, laser win pulse, and confetti celebration.
-  - **Replay System**: Post-game timeline slider and Left/Right arrow scrubbing to replay any move.
-  - **Game Exporter**: One-click export to timestamped text record in `results/`.
-  - **Chess Clock**: Per-player thinking clocks in top HUD.
-  - **Opening Book**: Connect Four game-theoretic opening lines (Allis 1988) with instant opening book moves.
-  - **Adaptive Difficulty**: Auto-ramps AI level upon consecutive player win streaks.
-  - **Procedural Audio**: Gentle physical disc drop sounds, hint chimes, and win fanfares (toggle with 'M' or mute button).
-- **Experiments**: Arena benchmark runner and automated figure generation in `experiments/`.
+**Search algorithms** (`agents/`)
 
-## Requirements
+| Agent | Technique |
+|:---|:---|
+| Minimax | Fixed-depth game-tree search with a heuristic evaluation |
+| Alpha-Beta | Minimax with pruning; returns the same move as Minimax at equal depth |
+| + Move ordering | Centre columns searched first, so more branches are pruned |
+| + Iterative deepening | Searches depth 1, 2, 3, ... until a time limit runs out |
+| + Transposition table | Zobrist hashing so repeated positions are not searched twice |
+| MCTS | Monte Carlo Tree Search with the UCB1 (UCT) selection rule |
 
-- Python 3.10 or later
-- Pygame, NumPy, Matplotlib, Pandas, Pytest
+Every agent shares one interface, `choose_move(board) -> column`, so any agent
+can play against any other. All randomness uses an explicit seed, so results
+are reproducible.
 
-## Setup
+**Strategy coach** (`gui/`)
+
+- Three modes: you vs the computer, two players on one screen, and AI vs AI.
+- Four opponents: Rookie (Alpha-Beta, depth 2), Tactician (depth 5),
+  Grandmaster (depth 7 with iterative deepening) and Gambler (MCTS).
+- An evaluation bar that shows who is ahead, in plain words.
+- Hints that score every column and give a one-line reason ("Blocks the
+  opponent's threat").
+- Five tactics puzzles, an opening book, and per-player clocks.
+- An engine panel showing positions searched, pruning rate and search depth.
+- A demo mode with varied openings, adaptive difficulty after two wins in a row,
+  light and dark themes, and sound effects.
+
+**Experiments** (`experiments/`, `report/`)
+
+Four reproducible studies, saved as CSV files and graphs in `results/` and
+compiled into a lab report in `report/`:
+
+1. **Ablation**: how much each Alpha-Beta optimisation reduces the search.
+2. **Tournament**: every agent plays every other agent.
+3. **Depth vs time**: how search cost grows with depth.
+4. **Weight tuning**: three evaluation weight sets compared.
+
+## Key results
+
+From the latest full run (20 games per match):
+
+- At depth 3, Alpha-Beta searched **52% fewer positions** than Minimax, and
+  **67% fewer** with move ordering and the transposition table.
+- Each extra level of depth multiplied the work by about **4.7**, compared with
+  7 for a search without pruning.
+- Tournament ranking by total wins: Grandmaster, Tactician, Gambler, Rookie.
+
+See `report/PROJECT_REPORT.html` for the full tables and graphs.
+
+## Getting started
+
+Requires Python 3.10 or later.
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-python -m pip install -r requirements.txt
-```
-
-## Launch the Game
-
-```bash
+pip install -r requirements.txt
 python -m gui.app
 ```
 
-### In-Game Controls
-- **Click column**: Drop disc (when it's your turn)
-- **H / Click '💡 Hint'**: Reveal tactical move scores and engine reasoning
-- **P / Click '🧩 Puzzles'**: Cycle through 5 interactive tactical challenges
-- **R / Click '▶ New Game'**: Rematch / reset board
-- **M / Click '🔊'**: Toggle procedural sound effects
-- **Click '↩ Undo'**: Take back move (1 move in 2-player, 2 moves in vs AI)
-- **Click '🎬 Demo'**: Launch presentation demo mode with pre-set midgame
-- **Click '📊 Results'**: Browse experiment graphs directly inside the app
-- **Click '💾 Export'**: Export finished game record to `results/`
-- **Left / Right Arrows & Bottom Slider**: Scrub through replay moves after game ends
+## Controls
 
-## Run Experiments & Tests
+| Action | Mouse | Key |
+|:---|:---|:---|
+| Drop a disc | Click a column | |
+| Show a hint | Hint | H |
+| Start or skip a puzzle | Puzzles | P |
+| Next puzzle after solving | | Space / Enter |
+| New game | New Game | R |
+| Take back a move | Undo | |
+| Watch a demo game | Demo | |
+| View experiment graphs | Results | |
+| Switch light / dark theme | Theme button | L |
+| Sound on / off | Speaker button | M |
+| Back to the start menu | Menu | |
+| Quit | | Esc |
+
+## Tests and experiments
 
 ```bash
-# Run all unit tests
-python -m pytest
-
-# Run fast smoke benchmark experiments
-python -m experiments.run_all --quick
-
-# Compile comprehensive lab report (Markdown + HTML)
-python -m report.generate
+python -m pytest                          # 208 tests, about 25 seconds
+python -m experiments.run_all             # all four studies (about 8 minutes)
+python -m experiments.run_all --quick     # 10 games per match instead of 20
+python -m experiments.plot_results        # draw the graphs
+python -m report.generate                 # runs the tests, then writes the report
 ```
 
+## Project structure
 
+```
+game/         Board, rules, win detection, undo
+agents/       Minimax, Alpha-Beta, transposition table, MCTS, evaluation
+gui/          Pygame strategy coach
+experiments/  Match runner, the four studies, graphs
+report/       Lab report generator
+tests/        Unit tests for every layer
+results/      Experiment CSV files and graphs
+config.py     Board size, search and display constants
+```
+
+## Design notes
+
+- The board is a 6×7 grid (row 0 at the bottom) with a move history. A win is
+  checked only along the four lines through the last move.
+- Search agents play moves on the real board and undo them, so the board is
+  always restored exactly before an agent returns its move.
+- Alpha-Beta agents always pick the same move in the same position, so every
+  pair of experiment games starts from a different seeded random opening,
+  played once with each agent moving first.

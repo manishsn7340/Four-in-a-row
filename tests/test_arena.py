@@ -55,3 +55,31 @@ def test_move_counts_are_positive() -> None:
     r = play_match(a, b, n_games=6, seed=0)
 
     assert all(m > 0 for m in r.move_counts)
+
+
+def test_openings_make_deterministic_agents_play_different_games() -> None:
+    """From an empty board two deterministic agents replay the same two games;
+    seeded openings give varied games and the same result for the same seed."""
+    def run(openings: int):
+        a = AlphaBetaAgent(depth=1, weights=WEIGHTS, name="A")
+        b = AlphaBetaAgent(depth=2, weights=WEIGHTS, name="B")
+        return play_match(a, b, n_games=8, seed=3, openings=openings)
+
+    plain, first, second = run(0), run(4), run(4)
+    assert plain.move_counts[0::2] == [plain.move_counts[0]] * 4
+    assert plain.move_counts[1::2] == [plain.move_counts[1]] * 4
+    assert len(set(first.move_counts)) > 2
+    assert first.move_counts == second.move_counts
+    assert (first.wins_a, first.wins_b, first.draws) == (second.wins_a, second.wins_b, second.draws)
+
+
+def test_random_opening_is_seeded_and_never_finishes_the_game() -> None:
+    import random
+
+    from experiments.arena import random_opening
+    from helpers import play
+
+    first = [random_opening(random.Random(s), 6) for s in range(30)]
+    assert first == [random_opening(random.Random(s), 6) for s in range(30)]
+    assert len(set(map(tuple, first))) > 1
+    assert all(len(o) == 6 and not play(o).is_terminal() for o in first)

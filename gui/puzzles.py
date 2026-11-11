@@ -1,4 +1,4 @@
-"""gui/puzzles.py — Connect Four tactical challenges and puzzle trainer."""
+"""Five tactics puzzles: play the given moves, then find `solution_col`."""
 
 from __future__ import annotations
 
@@ -80,6 +80,5 @@ PUZZLES: list[Puzzle] = [
 
 
 def get_puzzle(puzzle_id: int) -> Puzzle:
-    """Return puzzle by 1-indexed ID (1..len(PUZZLES)). Clamps to valid range."""
-    idx = max(0, min(len(PUZZLES) - 1, puzzle_id - 1))
-    return PUZZLES[idx]
+    """Puzzle by 1-based id, clamped to the valid range."""
+    return PUZZLES[max(0, min(len(PUZZLES) - 1, puzzle_id - 1))]

@@ -2,38 +2,13 @@
 
 from __future__ import annotations
 
-import random
-
 import pytest
 
 from agents.alphabeta import AlphaBetaAgent
 from agents.zobrist import EXACT, LOWER, UPPER, TranspositionTable, Zobrist
 from config import TT_MAX_ENTRIES
 from game.board import Board
-
-
-def seeded_positions(count: int) -> list[Board]:
-    """Create reproducible non-terminal positions for search comparisons."""
-    rng = random.Random(161803)
-    positions: list[Board] = []
-    while len(positions) < count:
-        board = Board()
-        for _ in range(rng.randint(6, 18)):
-            if board.is_terminal():
-                break
-            board.drop(rng.choice(board.legal_moves()))
-        if not board.is_terminal():
-            positions.append(board)
-    return positions
-
-
-def snapshot(board: Board) -> tuple[tuple[tuple[int, ...], ...], tuple[int, ...], int]:
-    """Capture the board, move history, and hash for restoration checks."""
-    return (
-        tuple(tuple(row) for row in board.grid),
-        tuple(board.move_history),
-        board.hash,
-    )
+from helpers import seeded_positions, snapshot
 
 
 def test_zobrist_keys_are_seeded_and_hash_tracks_drops_and_undos() -> None:
@@ -114,7 +89,7 @@ def test_transposition_table_rejects_invalid_flags() -> None:
 
 def test_alpha_beta_with_tt_matches_without_tt_on_seeded_positions() -> None:
     """Preserve the root score when cached exact and bound results are reused."""
-    for position in seeded_positions(30):
+    for position in seeded_positions(30, 161803, 6, 18):
         before = snapshot(position)
         plain = AlphaBetaAgent(depth=5, use_ordering=True)
         cached = AlphaBetaAgent(depth=5, use_ordering=True, use_tt=True)
